@@ -118,8 +118,8 @@ class Voronoi
             $edge->setEndPoint($lSite, $rSite, $vb);
         }
 
-        $this->cells[$lSite->id]->_halfedges[] = new HalfEdge($edge, $lSite, $rSite);
-        $this->cells[$rSite->id]->_halfedges[] = new HalfEdge($edge, $rSite, $lSite);
+        $this->cells[$lSite->id]->half_edges[] = new HalfEdge($edge, $lSite, $rSite);
+        $this->cells[$rSite->id]->half_edges[] = new HalfEdge($edge, $rSite, $lSite);
 
         return $edge;
     }
@@ -886,10 +886,10 @@ class Voronoi
     // Close the cells.
     // The cells are bound by the supplied bounding box.
     // Each cell refers to its associated site, and a list
-    // of halfedges ordered counterclockwise.
+    // of half edges ordered counterclockwise.
     public function closeCells($bbox)
     {
-        // prune, order halfedges, then add missing ones
+        // prune, order half edges, then add missing ones
         // required to close cells
         $xl = $bbox->xl;
         $xr = $bbox->xr;
@@ -901,7 +901,7 @@ class Voronoi
         while ($iCell--) {
             $cell = $cells[$iCell];
 
-            // trim non fully-defined halfedges and sort them counterclockwise
+            // trim non fully-defined half_edges and sort them counterclockwise
             if (!$cell->prepare()) {
                 continue;
             }
@@ -910,7 +910,7 @@ class Voronoi
             // step 1: find first 'unclosed' point, if any.
             // an 'unclosed' point will be the end point of a halfedge which
             // does not match the start point of the following halfedge
-            $nHalfedges = count($cell->_halfedges);
+            $nHalfedges = count($cell->half_edges);
 
             // special case: only one site, in which case, the viewport is the cell
             // ...
@@ -919,8 +919,8 @@ class Voronoi
 
             while ($iLeft < $nHalfedges) {
                 $iRight = ($iLeft + 1) % $nHalfedges;
-                $endPoint = $cell->_halfedges[$iLeft]->getEndpoint();
-                $startPoint = $cell->_halfedges[$iRight]->getStartpoint();
+                $endPoint = $cell->half_edges[$iLeft]->getEndpoint();
+                $startPoint = $cell->half_edges[$iRight]->getStartpoint();
 
                 // if end point is not equal to start point, we need to add the missing
                 // halfedge(s) to close the cell
@@ -945,11 +945,11 @@ class Voronoi
                     }
 
                     if (isset($vb)) {
-                        $edge = $this->createBorderEdge($cell->_site, $va, $vb);
-                        $newHalfedge = new HalfEdge($edge, $cell->_site, null);
+                        $edge = $this->createBorderEdge($cell->site, $va, $vb);
+                        $newHalfedge = new HalfEdge($edge, $cell->site, null);
 
-                        array_splice($cell->_halfedges, $iLeft + 1, 0, [$newHalfedge]);
-                        $nHalfedges = count($cell->_halfedges);
+                        array_splice($cell->half_edges, $iLeft + 1, 0, [$newHalfedge]);
+                        $nHalfedges = count($cell->half_edges);
                     }
                 }
 
