@@ -1,13 +1,15 @@
 # PHP implementation of Steven Fortune's Voronoï algorithm.
 
-This lets you create Voronoï graphs (also called Thyssen polygons) automatically by computing the polygon coordinates based on the points.
+This lets you create Voronoï graphs automatically by computing the polygon coordinates based on a set of points.
 
 It was originally written by Samuel Roze based on a JavaScript library by Raymond Hill.
 
-## Example usage
+## Example Usage
 
 To generate polygons, you need to have a _bounding box_ that will define the box within you'll compute your graph.
 Then, you need some points. Here's a simple snippet that generate random points, and them compute the polygons.
+
+For a more complete example, check out the file `sample/voronoi.php`.
 
 Note that bounding box is in the var `$bbox`, and points in `$sites`.
 
@@ -41,15 +43,14 @@ for ($i=0; $i < $n; $i++) {
 // Compute the diagram
 $voronoi = new Voronoi();
 $diagram = $voronoi->compute($sites, $bbox);
-
-// You now have the cells (polygons) on the
-// $diagram['cells'] variable.
 ```
 
-You can now draw an image that represent the points and the polygons:
+You now have the cells (polygons) in the `$diagram['cells']` variable. With this, you can draw an image that represents 
+the points and the polygons:
+
 ```php
 // Create image using GD
-$im = imagecreatetruecolor($width, $height);
+$im = imagecreatetruecolor(400, 400);
 
 // Create colors
 $white = imagecolorallocate($im, 255, 255, 255);
@@ -71,8 +72,8 @@ $j = 0;
 foreach ($diagram['cells'] as $cell) {
 	$points = array();
  
-	if (count($cell->_halfedges) > 0) {
-		$v = $cell->_halfedges[0]->getStartPoint();
+	if (count($cell->half_edges) > 0) {
+		$v = $cell->half_edges[0]->getStartPoint();
 		if ($v) {
 			$points[] = $v->x;
 			$points[] = $v->y;
@@ -80,8 +81,8 @@ foreach ($diagram['cells'] as $cell) {
 			var_dump($j.': no start point');
 		}
  
-		for ($i = 0; $i < count($cell->_halfedges); $i++) {
-			$halfedge = $cell->_halfedges[$i];
+		for ($i = 0; $i < count($cell->half_edges); $i++) {
+			$halfedge = $cell->half_edges[$i];
 			$edge = $halfedge->edge;
  
 			if ($edge->va && $edge->vb) {
