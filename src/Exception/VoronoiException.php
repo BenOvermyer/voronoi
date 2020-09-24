@@ -1,6 +1,6 @@
 <?php
 
-namespace sroze\voronoi\Nurbs\Exceptions;
+namespace Voronoi\Exception;
 
 class VoronoiException extends \Exception
 {
