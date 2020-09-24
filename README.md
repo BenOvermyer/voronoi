@@ -1,19 +1,23 @@
 # PHP implementation of Steven Fortune's Voronoï algorithm.
 
-It helps you to create Voronoï graphs (also called Thyssen polygons) automaticaly by computing the polygon coordinates based on the points.
+This lets you create Voronoï graphs (also called Thyssen polygons) automatically by computing the polygon coordinates based on the points.
+
+It was originally written by Samuel Roze based on a JavaScript library by Raymond Hill.
 
 ## Example usage
-To generate polygons, you need to have a _border box_ that will define the box within you'll compute your graph.
+
+To generate polygons, you need to have a _bounding box_ that will define the box within you'll compute your graph.
 Then, you need some points. Here's a simple snippet that generate random points, and them compute the polygons.
 
-Note that border box is in the var *$bbox*, and points in *$sites*.
+Note that bounding box is in the var `$bbox`, and points in `$sites`.
 
 ```php
 <?php 
-require_once '../library/Nurbs/Voronoi.php';
-require_once '../library/Nurbs/Point.php';
+
+use Voronoi\Voronoi;
+use Voronoi\Point;
  
-// Create the borderbox
+// Create the bounding box
 $bbox = new stdClass();
 $bbox->xl = 0;
 $bbox->xr = 400;
@@ -28,9 +32,9 @@ $dy = $height = 400;
 $n = 20;
 
 // Generate random points
-$sites = array();
+$sites = [];
 for ($i=0; $i < $n; $i++) {
-    $point = new Nurbs_Point(rand($xo, $dx), rand($yo, $dy));
+    $point = new Point(rand($xo, $dx), rand($yo, $dy));
 	  $sites[] = $point;
 }
 
@@ -102,9 +106,3 @@ foreach ($diagram['cells'] as $cell) {
 imagepng($im, 'voronoi.png');
 
 ```
-
-That's all. Be free to contrubute or contact me.
-
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/sroze/php-voronoi-algorithm/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
-

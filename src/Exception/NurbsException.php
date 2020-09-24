@@ -1,8 +1,8 @@
 <?php
 
-namespace sroze\voronoi\Nurbs\Exceptions;
+namespace Voronoi\Exception;
 
 class NurbsException extends \Exception
 {
-    
+
 }

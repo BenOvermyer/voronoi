@@ -1,0 +1,31 @@
+{
+    "name": "benovermyer/voronoi",
+    "description": "Generate Voronoi polygons using Fortune's algorithm",
+    "version": "0.1.0",
+    "keywords": [
+        "voronoi", "mathematics"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ben Overmyer",
+            "email": "ben@overmyer.net"
+        },
+        {
+            "name": "Samuel Roze",
+            "email": "samuel.roze@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Voronoi\\": "src/"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.3"
+    }
+}
