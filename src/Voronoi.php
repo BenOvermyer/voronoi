@@ -42,10 +42,18 @@ class Voronoi
         $siteEvents = array_slice($sites, 0);
         usort($siteEvents, function ($a, $b) {
             $r = $b->y - $a->y;
-            if ($r) {
-                return $r;
+            if ($r > 0) {
+                return 1;
+            } elseif ($r < 0) {
+                return -1;
             }
-            return $b->x - $a->x;
+            $s = $b->x - $a->x;
+            if ($s > 0) {
+                return 1;
+            } elseif ($s < 0) {
+                return -1;
+            }
+            return 0;
         });
 
         // process queue
