@@ -1,9 +1,18 @@
 <?php
 
-require_once '../vendor/autoload.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use Voronoi\Voronoi;
 use Voronoi\Point;
+
+/**
+ * GD only accepts integer coordinates, so convert explicitly instead of
+ * relying on the implicit (and lossy) float-to-int conversion.
+ */
+function toInt(float $value): int
+{
+    return (int) round($value);
+}
 
 function make_image(int $n)
 {
@@ -26,7 +35,6 @@ function make_image(int $n)
     $im = imagecreatetruecolor($width, $height);
     $white = imagecolorallocate($im, 255, 255, 255);
     $red = imagecolorallocate($im, 255, 0, 0);
-    $green = imagecolorallocate($im, 0, 100, 0);
     $black = imagecolorallocate($im, 0, 0, 0);
     imagefill($im, 0, 0, $white);
 
@@ -35,13 +43,18 @@ function make_image(int $n)
         $point = new Point(mt_rand($xo, $dx), mt_rand($yo, $dy));
         $sites[] = $point;
 
-        imagerectangle($im, $point->x - 2, $point->y - 2, $point->x + 2, $point->y + 2, $black);
+        imagerectangle(
+            $im,
+            toInt($point->x) - 2,
+            toInt($point->y) - 2,
+            toInt($point->x) + 2,
+            toInt($point->y) + 2,
+            $black
+        );
     }
 
     $voronoi = new Voronoi();
     $diagram = $voronoi->compute($sites, $bbox);
-
-    $j = 0;
 
     foreach ($diagram['cells'] as $cell) {
         $points = [];
@@ -49,10 +62,8 @@ function make_image(int $n)
         if (count($cell->half_edges) > 0) {
             $v = $cell->half_edges[0]->getStartPoint();
             if ($v) {
-                $points[] = $v->x;
-                $points[] = $v->y;
-            } else {
-                var_dump($j . ': no start point');
+                $points[] = toInt($v->x);
+                $points[] = toInt($v->y);
             }
 
             for ($i = 0; $i < count($cell->half_edges); $i++) {
@@ -60,23 +71,33 @@ function make_image(int $n)
                 $edge = $halfedge->edge;
 
                 if ($edge->va && $edge->vb) {
-                    imageline($im, $edge->va->x, $edge->va->y, $edge->vb->x, $edge->vb->y, $red);
+                    imageline(
+                        $im,
+                        toInt($edge->va->x),
+                        toInt($edge->va->y),
+                        toInt($edge->vb->x),
+                        toInt($edge->vb->y),
+                        $red
+                    );
                 }
 
                 $v = $halfedge->getEndPoint();
                 if ($v) {
-                    $points[] = $v->x;
-                    $points[] = $v->y;
-                } else {
-                    var_dump($j . ': no end point #' . $i);
+                    $points[] = toInt($v->x);
+                    $points[] = toInt($v->y);
                 }
             }
         }
 
-        // Draw Thyssen polygon
+        // GD needs at least three vertices for a polygon.
+        if (count($points) < 6) {
+            continue;
+        }
+
+        // Draw Thyssen polygon. PHP 8.1+ expects the three-argument form:
+        // imagefilledpolygon($image, array $points, int $color).
         $color = imagecolorallocatealpha($im, mt_rand(0, 255), mt_rand(0, 255), mt_rand(0, 255), 50);
-        imagefilledpolygon($im, $points, count($points) / 2, $color);
-        $j++;
+        imagefilledpolygon($im, $points, $color);
     }
 
     // Display image
@@ -84,12 +105,8 @@ function make_image(int $n)
     imagedestroy($im);
 }
 
-if (!empty($argv[1])) {
-    $n = $argv[1];
-}
+$n = !empty($argv[1]) ? (int) $argv[1] : 1;
 
-$n = !empty($argv[1]) ? (int)$argv[1] : 1;
-
-for ($i=0;$i<$n;$i++) {
+for ($i = 0; $i < $n; $i++) {
     make_image($i);
 }

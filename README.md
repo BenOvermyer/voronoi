@@ -4,6 +4,16 @@ This lets you create Voronoï graphs automatically by computing the polygon coor
 
 It was originally written by Samuel Roze based on a JavaScript library by Raymond Hill.
 
+## Requirements
+
+PHP 8.2 or later.
+
+## Installation
+
+```bash
+composer require benovermyer/voronoi
+```
+
 ## Example Usage
 
 To generate polygons, you need to have a _bounding box_ that will define the box within you'll compute your graph.
@@ -14,11 +24,11 @@ For a more complete example, check out the file `sample/voronoi.php`.
 Note that bounding box is in the var `$bbox`, and points in `$sites`.
 
 ```php
-<?php 
+<?php
 
 use Voronoi\Voronoi;
 use Voronoi\Point;
- 
+
 // Create the bounding box
 $bbox = new stdClass();
 $bbox->xl = 0;
@@ -45,7 +55,7 @@ $voronoi = new Voronoi();
 $diagram = $voronoi->compute($sites, $bbox);
 ```
 
-You now have the cells (polygons) in the `$diagram['cells']` variable. With this, you can draw an image that represents 
+You now have the cells (polygons) in the `$diagram['cells']` variable. With this, you can draw an image that represents
 the points and the polygons:
 
 ```php
@@ -60,50 +70,82 @@ $black = imagecolorallocate($im, 0, 0, 0);
 
 // Fill white background
 imagefill($im, 0, 0, $white);
- 
+
 // Draw points
 for ($i=0; $i < $n; $i++) {
     $point = $sites[$i];
-	  imagerectangle($im, $point->x - 2, $point->y - 2, $point->x + 2, $point->y + 2, $black);
+	  imagerectangle(
+        $im,
+        (int) round($point->x) - 2,
+        (int) round($point->y) - 2,
+        (int) round($point->x) + 2,
+        (int) round($point->y) + 2,
+        $black
+    );
 }
 
 // Draw polygons
-$j = 0;
 foreach ($diagram['cells'] as $cell) {
 	$points = array();
- 
+
 	if (count($cell->half_edges) > 0) {
 		$v = $cell->half_edges[0]->getStartPoint();
 		if ($v) {
-			$points[] = $v->x;
-			$points[] = $v->y;
-		} else {
-			var_dump($j.': no start point');
+			$points[] = (int) round($v->x);
+			$points[] = (int) round($v->y);
 		}
- 
+
 		for ($i = 0; $i < count($cell->half_edges); $i++) {
 			$halfedge = $cell->half_edges[$i];
 			$edge = $halfedge->edge;
- 
+
 			if ($edge->va && $edge->vb) {
-				imageline($im, $edge->va->x, $edge->va->y, $edge->vb->x, $edge->vb->y, $red);
+				imageline(
+					$im,
+					(int) round($edge->va->x),
+					(int) round($edge->va->y),
+					(int) round($edge->vb->x),
+					(int) round($edge->vb->y),
+					$red
+				);
 			}
- 
+
 			$v = $halfedge->getEndPoint();
 			if ($v) {
-				$points[] = $v->x;
-				$points[] = $v->y;
+				$points[] = (int) round($v->x);
+				$points[] = (int) round($v->y);
 			}
 		}
 	}
- 
-	// Create polygon with a random color
+
+	// GD needs at least three vertices for a polygon
+	if (count($points) < 6) {
+		continue;
+	}
+
+	// Create polygon with a random color. PHP 8.1+ uses the three-argument form.
 	$color = imagecolorallocatealpha($im, rand(0, 255), rand(0, 255), rand(0, 255), 50);
-	imagefilledpolygon($im, $points, count($points) / 2, $color);
-	$j++;
+	imagefilledpolygon($im, $points, $color);
 }
- 
+
 // Display image
 imagepng($im, 'voronoi.png');
-
 ```
+
+## Result metadata
+
+`compute()` returns an array with the following keys:
+
+- `sites`: the input sites (coordinates normalized to floats, and given an `id`)
+- `cells`: the cells, indexed by site id
+- `edges`: the diagram edges
+- `execTime`: the computation duration **in seconds**
+
+## Testing
+
+```bash
+composer install
+composer test
+```
+
+The suite runs on PHP 8.2, 8.3, 8.4 and 8.5 in CI. Deprecations, warnings and notices are treated as failures.
