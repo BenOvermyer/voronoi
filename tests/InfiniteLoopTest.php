@@ -2,23 +2,26 @@
 
 namespace Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Large;
 use PHPUnit\Framework\TestCase;
-use Voronoi\Voronoi;
 use Voronoi\Point;
+use Voronoi\Voronoi;
 
+#[Large]
 final class InfiniteLoopTest extends TestCase
 {
     /**
      * Test diagram creation without infinite loop.
-     * The maximum execution time is 60 seconds.
+     * The maximum execution time is 60 seconds (enforced by PHPUnit's time
+     * limit for large tests).
      *
      * @param int width Width of diagram
      * @param int height Height of diagram
      * @param array points The diagram points
-     *
-     * @dataProvider provider
      */
-    public function testVoronoi(int $width, int $height, array $basicPoints)
+    #[DataProvider('provider')]
+    public function testVoronoi(int $width, int $height, array $basicPoints): void
     {
         // Create border box
         $bbox = new \stdClass();
@@ -37,7 +40,9 @@ final class InfiniteLoopTest extends TestCase
         $voronoi = new Voronoi();
         $diagram = $voronoi->compute($points, $bbox);
 
-        $this->assertTrue(is_array($diagram));
+        $this->assertIsArray($diagram);
+        $this->assertNotEmpty($diagram['cells']);
+        $this->assertNotEmpty($diagram['edges']);
     }
 
     /**
@@ -45,15 +50,15 @@ final class InfiniteLoopTest extends TestCase
      *
      * @return array
      */
-    public function provider()
+    public static function provider(): array
     {
         // Read points
-        $file = file(getcwd() . '/tests/data/issue4.dat');
+        $file = file(__DIR__ . '/data/issue4.dat');
         $points = [];
         foreach ($file as $line) {
             [$x, $y] = explode(',', trim($line));
 
-            $points[] = [$x, $y];
+            $points[] = [(float) $x, (float) $y];
         }
 
         return [

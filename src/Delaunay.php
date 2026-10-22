@@ -2,6 +2,8 @@
 
 namespace Voronoi;
 
+use Voronoi\Exception\VoronoiException;
+
 class Delaunay
 {
     /**
@@ -9,14 +11,19 @@ class Delaunay
      *
      * @param array $points of Point
      * @return array of Triangle
+     * @throws VoronoiException
      */
     public static function triangulate(array $points): array
     {
+        $points = array_values($points);
+
         // We record the name of points
         $nv = count($points);
 
-        // We calculate the maximal name of triangles
-        $triMax = $nv * 4;
+        // Nothing to triangulate without at least three distinct coordinates.
+        if ($nv < 3) {
+            return [];
+        }
 
         // We look for the outer edges of the points
         $xMin = $points[0]->x;
@@ -24,7 +31,7 @@ class Delaunay
         $xMax = $xMin;
         $yMax = $yMin;
 
-        for ($i = 0; $i < count($points); $i++) {
+        for ($i = 0; $i < $nv; $i++) {
             // We add an ID to the point and we get it
             $point = $points[$i]->setId($i);
 
@@ -45,9 +52,13 @@ class Delaunay
         // We calculate the maximum coordinate differences
         $dx = $xMax - $xMin;
         $dy = $yMax - $yMin;
-
-        // We then create the super-triangle, which contains all the points.
         $dmax = ($dx > $dy) ? $dx : $dy;
+
+        // Every point shares the same coordinates: there is no triangle.
+        if ($dmax <= 0) {
+            return [];
+        }
+
         $xmid = ($xMax + $xMin) / 2;
         $ymid = ($yMax + $yMin) / 2;
 
@@ -65,6 +76,9 @@ class Delaunay
         $points[] = $p1;
         $points[] = $p2;
         $points[] = $p3;
+
+        // We calculate the maximal name of triangles
+        $triMax = $nv * 4;
 
         // We create the list of triangles and we add the super-triangle
         $triangles = [];
@@ -90,35 +104,38 @@ class Delaunay
                 }
             }
 
-            // If the last point removed was the last in the array
-            if ($i >= $nv) {
-                continue;
-            }
+            // We keep only the edges that occurred once. Tracking them by a
+            // canonical pair of endpoint IDs avoids comparing every edge pair.
+            $uniqueEdges = [];
+            $edgeCounts = [];
+            foreach ($edges as $edge) {
+                $id1 = $edge->p1->id;
+                $id2 = $edge->p2->id;
+                $key = $id1 < $id2 ? $id1 . ':' . $id2 : $id2 . ':' . $id1;
 
-            // We remove duplicate lines
-            for ($j = count($edges) - 2; $j >= 0; $j--) {
-                for ($k = count($edges) - 1; $k >= $j + 1; $k--) {
-                    // If the two lines are equal, we delete them
-                    if ($edges[$j]->equals($edges[$k])) {
-                        array_splice($edges, $k, 1);
-                        array_splice($edges, $j, 1);
-                        $k--;
-                    }
+                if (!isset($edgeCounts[$key])) {
+                    $edgeCounts[$key] = 1;
+                    $uniqueEdges[$key] = $edge;
+                } else {
+                    $edgeCounts[$key]++;
                 }
             }
 
             // We create new triangles for the current point
-            for ($j = 0; $j < count($edges); $j++) {
-                if (count($triangles) >= $triMax) {
-                    echo "Nombre maximum de edges dépassé";
+            foreach ($edgeCounts as $key => $count) {
+                if ($count !== 1) {
+                    continue;
                 }
 
-                // We add the triangle
-                $triangles[] = new Nurbs_Triangle($edges[$j]->p1, $edges[$j]->p2, $points[$i]);
-            }
+                if (count($triangles) >= $triMax) {
+                    throw new VoronoiException('The maximum number of triangles has been reached');
+                }
 
-            // We purge the list of edges
-            $edges = [];
+                $edge = $uniqueEdges[$key];
+
+                // We add the triangle
+                $triangles[] = new Triangle($edge->p1, $edge->p2, $points[$i]);
+            }
         }
 
         // We remove the triangles having edges of the super triangle

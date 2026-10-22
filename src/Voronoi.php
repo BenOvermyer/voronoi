@@ -38,6 +38,21 @@ class Voronoi
     {
         $startTime = microtime(true);
 
+        // Reset every piece of per-computation state so that reusing an
+        // instance cannot mix the previous diagram with the new sites.
+        $this->edges = [];
+        $this->cells = [];
+        $this->first_circle_event = null;
+        $this->beach_line = new RBTree();
+        $this->circle_events = new RBTree();
+        $this->beach_section_junkyard = [];
+        $this->circle_event_junkyard = [];
+
+        // Validate and normalize coordinates once, at the input boundary.
+        // Numerically identical sites of different scalar types then take the
+        // same code paths everywhere in the algorithm.
+        $sites = $this->normalizeSites($sites);
+
         // Initialize site event queue
         $siteEvents = array_slice($sites, 0);
         usort($siteEvents, function ($a, $b) {
@@ -110,8 +125,65 @@ class Voronoi
             'sites' => $sites,
             'cells' => $this->cells,
             'edges' => $this->edges,
-            'execTime' => (microtime(true) - $startTime) / 1000, // in seconds
+            'execTime' => microtime(true) - $startTime, // in seconds
         ];
+    }
+
+    /**
+     * Validates and normalizes the site coordinates.
+     *
+     * @param mixed $sites
+     * @return Point[]
+     * @throws VoronoiException
+     */
+    private function normalizeSites($sites): array
+    {
+        if (!is_array($sites)) {
+            throw new VoronoiException('The sites must be given as an array of Point instances');
+        }
+
+        $normalized = [];
+
+        foreach ($sites as $site) {
+            if (!$site instanceof Point) {
+                throw new VoronoiException(sprintf(
+                    'The sites must be Point instances, %s given',
+                    get_debug_type($site)
+                ));
+            }
+
+            $site->x = $this->normalizeCoordinate($site->x, 'x');
+            $site->y = $this->normalizeCoordinate($site->y, 'y');
+
+            if ($site->z !== null) {
+                $site->z = $this->normalizeCoordinate($site->z, 'z');
+            }
+
+            $normalized[] = $site;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @throws VoronoiException
+     */
+    private function normalizeCoordinate($value, string $axis): float
+    {
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))) {
+            $coordinate = (float) $value;
+
+            if (is_finite($coordinate)) {
+                return $coordinate;
+            }
+        }
+
+        throw new VoronoiException(sprintf(
+            'Invalid %s coordinate: expected a finite number, %s given',
+            $axis,
+            get_debug_type($value)
+        ));
     }
 
     public function createEdge($lSite, $rSite, $va, $vb)
@@ -650,7 +722,7 @@ class Voronoi
         $fm = null;
 
         // get the line equation of the bisector if line is not vertical
-        if ($ry !== $ly) {
+        if ($ry != $ly) {
             $fm = ($lx - $rx) / ($ry - $ly);
             $fb = $fy - $fm * $fx;
         }
@@ -876,19 +948,25 @@ class Voronoi
     {
         // connect all dangling edges to bounding box
         // or get rid of them if it can't be done
-        $iEdge = count($this->edges);
+        $retained = [];
 
-        // iterate backward so we can splice safely
-        while ($iEdge--) {
-            $edge = $this->edges[$iEdge];
+        foreach ($this->edges as $edge) {
             // edge is removed if:
             //   it is wholly outside the bounding box
             //   it is actually a point rather than a line
-            if (!$this->connectEdge($edge, $bbox) || !$this->clipEdge($edge, $bbox) || (abs($edge->va->x - $edge->vb->x) < self::EPSILON && abs($edge->va->y - $edge->vb->y) < self::EPSILON)) {
+            if (!$this->connectEdge($edge, $bbox)
+                || !$this->clipEdge($edge, $bbox)
+                || (abs($edge->va->x - $edge->vb->x) < self::EPSILON
+                    && abs($edge->va->y - $edge->vb->y) < self::EPSILON)) {
                 $edge->va = $edge->vb = null;
-                array_splice($this->edges, $iEdge, 1);
+                continue;
             }
+
+            $retained[] = $edge;
         }
+
+        // Single reindex instead of one array_splice() per rejected edge.
+        $this->edges = $retained;
     }
 
     // Close the cells.
@@ -905,6 +983,15 @@ class Voronoi
         $yb = $bbox->yb;
         $iCell = count($this->cells);
         $cells = $this->cells;
+
+        // Special case: a single unique site owns the whole viewport, but the
+        // sweep produced no edge for it, so prepare() would return 0 and the
+        // cell would be skipped. Build the bounding rectangle explicitly.
+        if ($iCell === 1) {
+            $cell = reset($cells);
+            $this->closeSingleCell($cell, $bbox);
+            return;
+        }
 
         while ($iCell--) {
             $cell = $cells[$iCell];
@@ -964,6 +1051,36 @@ class Voronoi
                 $iLeft++;
             }
         }
+    }
+
+    /**
+     * Build the four bounding edges and half edges of a single-site cell, so
+     * that its polygon is the whole bounding box.
+     */
+    private function closeSingleCell(Cell $cell, $bbox): void
+    {
+        $xl = $bbox->xl;
+        $xr = $bbox->xr;
+        $yt = $bbox->yt;
+        $yb = $bbox->yb;
+
+        // Counterclockwise rectangle: top, right, bottom, left.
+        $corners = [
+            [$xl, $yt, $xr, $yt],
+            [$xr, $yt, $xr, $yb],
+            [$xr, $yb, $xl, $yb],
+            [$xl, $yb, $xl, $yt],
+        ];
+
+        $cell->half_edges = [];
+
+        foreach ($corners as [$ax, $ay, $bx, $by]) {
+            $edge = $this->createBorderEdge($cell->site, new Point($ax, $ay), new Point($bx, $by));
+            $cell->half_edges[] = new HalfEdge($edge, $cell->site, null);
+        }
+
+        // The half edges are already listed counterclockwise and chained
+        // end-to-start, so no reordering is needed.
     }
 
     public function equalWithEpsilon($a, $b)

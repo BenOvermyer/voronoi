@@ -20,7 +20,7 @@ class Edge
     public $va = null;
     public $vb = null;
 
-    public function __construct(Point $p1 = null, Point $p2 = null)
+    public function __construct(?Point $p1 = null, ?Point $p2 = null)
     {
         // On stocke les points
         $this->p1 = $p1;

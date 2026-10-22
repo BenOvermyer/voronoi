@@ -13,10 +13,12 @@ class Vector extends Point
      */
     public static function fromPoints(Point $p1, Point $p2): Vector
     {
+        // Strict null checks: zero is a valid elevation and must not be
+        // treated as "no elevation".
         return new self(
             $p2->x - $p1->x,
             $p2->y - $p1->y,
-            (($p1->z != null && $p2->z != null) ? $p2->z - $p1->z : null)
+            ($p1->z !== null && $p2->z !== null ? $p2->z - $p1->z : null)
         );
     }
 
@@ -28,7 +30,7 @@ class Vector extends Point
      */
     public function scalarProduct(Vector $vector): float
     {
-        $scalarZ = ($this->z != null && $vector->z != null) ? $this->z * $vector->z : 0;
+        $scalarZ = ($this->z !== null && $vector->z !== null) ? $this->z * $vector->z : 0;
         return ($this->x * $vector->x + $this->y * $vector->y + $scalarZ);
     }
 
@@ -40,9 +42,12 @@ class Vector extends Point
      */
     public function vectorProduct(Vector $vector): Vector
     {
+        $thisZ = $this->z ?? 0;
+        $vectorZ = $vector->z ?? 0;
+
         return new Vector(
-            $this->y * $vector->z - $this->z * $vector->y,
-            $this->z * $vector->x - $this->x * $vector->z,
+            $this->y * $vectorZ - $thisZ * $vector->y,
+            $thisZ * $vector->x - $this->x * $vectorZ,
             $this->x * $vector->y - $this->y * $vector->x
         );
     }
