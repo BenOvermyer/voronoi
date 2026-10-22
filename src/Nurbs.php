@@ -15,7 +15,13 @@ class Nurbs extends AbstractSurface
 
     protected int $calculation_method = self::CALCULATE_CLASSIC;
 
-    protected $delaunay_surfaces;
+    /** @var Triangle[]|null */
+    protected ?array $delaunay_surfaces = null;
+
+    /**
+     * Fingerprint of the points the cached triangulation was built from.
+     */
+    protected ?string $delaunay_fingerprint = null;
 
     /**
      * Create a nurbs from an array of points.
@@ -50,7 +56,7 @@ class Nurbs extends AbstractSurface
      * @return Point
      * @throws NurbsException
      */
-    public function getPoint(int $x, int $y, float $radius = 1): Point
+    public function getPoint(int $x, int $y, float $radius = 3): Point
     {
         switch ($this->calculation_method) {
             case self::CALCULATE_DELAUNAY:
@@ -70,18 +76,28 @@ class Nurbs extends AbstractSurface
      */
     public function getDelaunayPoint(int $x, int $y): Point
     {
-        $triangles = $this->getDelaunaySurfaces();
+        $query = new Point($x, $y);
 
-        var_dump($triangles);
+        foreach ($this->getDelaunaySurfaces() as $triangle) {
+            if ($triangle->pointIn($query)) {
+                return $triangle->getPoint($x, $y);
+            }
+        }
+
+        throw new NurbsException(
+            sprintf('The point (%d, %d) is outside the Delaunay surface', $x, $y)
+        );
     }
 
     /**
      * Returns the Delaunay triangles of the surface, namely nurbs of 3 points.
      *
-     * @return array of Nurbs
+     * The triangulation is cached and rebuilt only when the points change.
+     *
+     * @return array of Triangle
      * @throws NurbsException
      */
-    public function getDelaunaySurfaces()
+    public function getDelaunaySurfaces(): array
     {
         // We check that there are enough points
         if (count($this->points) < 3) {
@@ -90,7 +106,49 @@ class Nurbs extends AbstractSurface
             );
         }
 
-        // We use the Delaunay library to retrieve the triangles
-        return Delaunay::triangulate($this->points);
+        $fingerprint = $this->fingerprint();
+
+        if ($this->delaunay_surfaces === null || $this->delaunay_fingerprint !== $fingerprint) {
+            // We use the Delaunay library to retrieve the triangles
+            $this->delaunay_surfaces = Delaunay::triangulate($this->points);
+            $this->delaunay_fingerprint = $fingerprint;
+        }
+
+        return $this->delaunay_surfaces;
+    }
+
+    /**
+     * Invalidates the cached triangulation.
+     */
+    public function clearCache(): void
+    {
+        $this->delaunay_surfaces = null;
+        $this->delaunay_fingerprint = null;
+    }
+
+    /**
+     * Appends points and invalidates the triangulation cache.
+     */
+    public function addPoints(array $points): void
+    {
+        parent::addPoints($points);
+
+        $this->clearCache();
+    }
+
+    /**
+     * Points are mutable, so the cache is validated against their current
+     * coordinates on every call. A point addition or a coordinate change
+     * therefore never returns stale geometry.
+     */
+    private function fingerprint(): string
+    {
+        $parts = [count($this->points)];
+
+        foreach ($this->points as $point) {
+            $parts[] = $point->x . ',' . $point->y . ',' . ($point->z ?? '');
+        }
+
+        return hash('xxh128', implode(';', $parts));
     }
 }

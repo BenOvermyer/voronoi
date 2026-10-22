@@ -44,11 +44,28 @@ class Point
      */
     public function equals(Point $point): bool
     {
-        return ($this->x == $point->x && $this->y == $point->y && (($this->z == null && $point->z == null) || $this->z == $point->z));
+        if ($this->x != $point->x || $this->y != $point->y) {
+            return false;
+        }
+
+        // Elevation presence matters: z = 0 is not the same as "no elevation".
+        if ($this->z === null || $point->z === null) {
+            return $this->z === null && $point->z === null;
+        }
+
+        return $this->z == $point->z;
+    }
+
+    /**
+     * Whether an elevation coordinate is defined.
+     */
+    public function hasElevation(): bool
+    {
+        return $this->z !== null;
     }
 
     public function __toString()
     {
-        return '(' . $this->x . ',' . $this->y . ($this->z != null ? ',' . $this->z : '') . ')';
+        return '(' . $this->x . ',' . $this->y . ($this->z !== null ? ',' . $this->z : '') . ')';
     }
 }
